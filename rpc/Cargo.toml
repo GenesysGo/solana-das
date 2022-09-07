@@ -54,7 +54,7 @@ spl-token = { git = "https://github.com/solana-labs/solana-program-library/", fe
 spl-token-2022 = { git = "https://github.com/solana-labs/solana-program-library/", features = ["no-entrypoint"] }
 stream-cancel = "0.8.1"
 thiserror = "1.0"
-tokio = { version = "~1.14.1", features = ["full"] }
+tokio = { version = "~1.16", features = ["full"] }
 tokio-util = { version = "0.6", features = ["codec", "compat"] }
 
 [dev-dependencies]
