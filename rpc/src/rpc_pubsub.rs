@@ -590,7 +590,7 @@ impl RpcSolPubSubInternal for RpcSolPubSubImpl {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod tests {
     use {
         super::{RpcSolPubSubInternal, *},

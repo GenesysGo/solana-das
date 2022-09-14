@@ -184,13 +184,13 @@ impl BroadcastHandler {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 pub struct TestBroadcastReceiver {
     handler: BroadcastHandler,
     inner: tokio::sync::broadcast::Receiver<RpcNotification>,
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 impl TestBroadcastReceiver {
     pub fn recv(&mut self) -> String {
         match self.recv_timeout(std::time::Duration::from_secs(10)) {
@@ -227,7 +227,7 @@ impl TestBroadcastReceiver {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 pub fn test_connection(
     subscriptions: &Arc<RpcSubscriptions>,
 ) -> (RpcSolPubSubImpl, TestBroadcastReceiver) {
@@ -376,7 +376,7 @@ async fn listen(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod tests {
     use {
         super::*,

@@ -1224,13 +1224,13 @@ impl RpcSubscriptions {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     fn total(&self) -> usize {
         self.control.total()
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 pub(crate) mod tests {
     use {
         super::*,

@@ -55,7 +55,7 @@ impl TpuInfo for ClusterTpuInfo {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod test {
     use {
         super::*,

@@ -1380,7 +1380,7 @@ dependencies = [
 [[package]]
 name = "das_api"
 version = "0.1.0"
-source = "git+https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git?branch=cavey/das_api_version#6e92bd1101fbda479e0d8e06db4ea7e1dabecc9f"
+source = "git+https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git?branch=cavey/das_api_version#c3eb6b4040531eea2d4bc79ec028536bc7aa44aa"
 dependencies = [
  "async-trait",
  "bs58 0.4.0",
@@ -1510,7 +1510,7 @@ dependencies = [
 [[package]]
 name = "digital_asset_types"
 version = "0.1.0"
-source = "git+https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git?branch=cavey/das_api_version#6e92bd1101fbda479e0d8e06db4ea7e1dabecc9f"
+source = "git+https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git?branch=cavey/das_api_version#c3eb6b4040531eea2d4bc79ec028536bc7aa44aa"
 dependencies = [
  "anchor-client",
  "bs58 0.4.0",
@@ -7185,6 +7185,8 @@ dependencies = [
  "crossbeam-channel",
  "das_api",
  "dashmap",
+ "digital_asset_types",
+ "env_logger",
  "itertools",
  "jsonrpc-core",
  "jsonrpc-core-client",

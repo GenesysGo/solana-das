@@ -7,6 +7,7 @@ use {
     },
     bincode::{config::Options, serialize},
     crossbeam_channel::{unbounded, Receiver, Sender},
+    das_api::api_impl::DasApi,
     jsonrpc_core::{futures::future, types::error, BoxFuture, Error, Metadata, Result},
     jsonrpc_derive::rpc,
     serde::{Deserialize, Serialize},
@@ -211,6 +212,7 @@ pub struct JsonRpcRequestProcessor {
     max_slots: Arc<MaxSlots>,
     leader_schedule_cache: Arc<LeaderScheduleCache>,
     max_complete_transaction_status_slot: Arc<AtomicU64>,
+    metaplex_plugin_db: Option<Arc<DasApi>>,
 }
 impl Metadata for JsonRpcRequestProcessor {}
 
@@ -336,6 +338,7 @@ impl JsonRpcRequestProcessor {
                 max_slots,
                 leader_schedule_cache,
                 max_complete_transaction_status_slot,
+                metaplex_plugin_db: None
             },
             receiver,
         )
@@ -400,7 +403,16 @@ impl JsonRpcRequestProcessor {
             max_slots: Arc::new(MaxSlots::default()),
             leader_schedule_cache: Arc::new(LeaderScheduleCache::new_from_bank(bank)),
             max_complete_transaction_status_slot: Arc::new(AtomicU64::default()),
+            metaplex_plugin_db: None,
         }
+    }
+
+    pub fn with_metaplex_plugin_db(
+        mut self,
+        metaplex_plugin_db: DasApi,
+    ) -> Self {
+        self.metaplex_plugin_db = Some(Arc::new(metaplex_plugin_db));
+        self
     }
 
     pub fn get_account_info(
@@ -2969,6 +2981,313 @@ pub mod rpc_bank {
     }
 }
 
+
+// RPC interface that uses metaplex db
+pub mod rpc_metaplex {
+    use super::*;
+    use das_api::{api::ApiContract};
+    use digital_asset_types::rpc::{AssetProof, Asset, filter::{AssetSorting, ListingSorting, OfferSorting}, response::{AssetList, OfferList, ListingsList}};
+    use jsonrpc_core::ErrorCode;
+
+    #[rpc]
+    pub trait MetaplexRpc {
+        type Metadata;
+
+        #[rpc(meta, name = "getSomethingFromPostgres")]
+        fn get_something_from_postgres(
+            &self,
+            meta: Self::Metadata,
+        ) -> BoxFuture<Result<String>>;
+
+        #[rpc(meta, name = "getAssetProof")]
+        fn get_asset_proof(
+            &self,
+            meta: Self::Metadata,
+            id: String,
+        ) -> BoxFuture<Result<AssetProof>>;
+
+        #[rpc(meta, name = "getAsset")]
+        fn get_asset(
+            &self,
+            meta: Self::Metadata,
+            id: String,
+        ) -> BoxFuture<Result<Asset>>;
+
+        #[rpc(meta, name = "getAssetsByOwner")]
+        fn get_assets_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>>;
+
+        #[rpc(meta, name = "getListedAssetsByOwner")]
+        fn get_listed_assets_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: ListingSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<ListingsList>>;
+
+        #[rpc(meta, name = "getOffersByOwner")]
+        fn get_offers_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: OfferSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<OfferList>>;
+
+        #[rpc(meta, name = "getAssetsByGroup")]
+        fn get_assets_by_group(
+            &self,
+            meta: Self::Metadata,
+            group_expression: Vec<String>,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>>;
+
+        #[rpc(meta, name = "getAssetsByCreator")]
+        fn get_assets_by_creator(
+            &self,
+            meta: Self::Metadata,
+            creator_expression: Vec<String>,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>>;
+
+        #[rpc(meta, name = "searchAssets")]
+        fn search_assets(
+            &self,
+            meta: Self::Metadata,
+            _search_expression: String,
+            _sort_by: AssetSorting,
+            _limit: u32,
+            _page: u32,
+            _before: String,
+            _after: String,
+        ) -> BoxFuture<Result<()>>;
+    }
+
+    pub struct MetaplexImpl;
+    impl MetaplexRpc for MetaplexImpl {
+        type Metadata = JsonRpcRequestProcessor;
+
+        fn get_something_from_postgres(
+            &self,
+            mut meta: Self::Metadata,
+        ) -> BoxFuture<Result<String>> {
+            Box::pin(async move { async move {
+                if let Some(ref mut db) = meta.metaplex_plugin_db {
+                    dbg!("lets fix this");
+                    db.check_health()
+                        .await
+                        .map_err(|err| {
+                            log::error!("{err:?}");
+                            jsonrpc_core::Error::new(ErrorCode::InternalError)
+                        })?;
+                }
+                Ok(String::from("RIP Queen"))
+            }.await })
+        }
+
+        fn get_asset_proof(
+            &self,
+            meta: Self::Metadata,
+            id: String
+        ) -> BoxFuture<Result<AssetProof>> {
+            Box::pin( async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_asset_proof(id).await;
+                } else {
+                    unreachable!()
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_asset(
+            &self,
+            meta: Self::Metadata,
+            id: String
+        ) -> BoxFuture<Result<Asset>> {
+            Box::pin( async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_asset(id).await;
+                } else {
+                    unreachable!()
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_assets_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_assets_by_owner(owner_address, sort_by, limit, page, before, after).await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_listed_assets_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: ListingSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<ListingsList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_listed_assets_by_owner(owner_address, sort_by, limit, page, before, after).await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_offers_by_owner(
+            &self,
+            meta: Self::Metadata,
+            owner_address: String,
+            sort_by: OfferSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<OfferList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_offers_by_owner(owner_address, sort_by, limit, page, before, after).await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_assets_by_group(
+            &self,
+            meta: Self::Metadata,
+            group_expression: Vec<String>,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_assets_by_group(group_expression, sort_by, limit, page, before, after).await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn get_assets_by_creator(
+            &self,
+            meta: Self::Metadata,
+            creator_expression: Vec<String>,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db.get_assets_by_creator(creator_expression, sort_by, limit, page, before, after).await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                    .map_err(|err| {
+                        log::error!("{err:?}");
+                        jsonrpc_core::Error::new(ErrorCode::InternalError)
+                    })
+            })
+        }
+
+        fn search_assets(
+            &self,
+            _meta: Self::Metadata,
+            _search_expression: String,
+            _sort_by: AssetSorting,
+            _limit: u32,
+            _page: u32,
+            _before: String,
+            _after: String,
+        ) -> BoxFuture<Result<()>> {
+            Box::pin(async move { todo!("The underlying rpc method is not implemented in the das api")})
+        }
+    }
+}
+
 // RPC interface that depends on AccountsDB
 // Expected to be provided by API nodes, but collected for easy separation and offloading to
 // accounts replica nodes in the future.
@@ -4559,9 +4878,11 @@ pub fn populate_blockstore_for_tests(
 
 #[cfg(test)]
 pub mod tests {
+    use digital_asset_types::rpc::{Asset, Interface, Ownership, OwnershipModel, AssetProof, response::AssetList, Royalty, Compression, Content};
+
     use {
         super::{
-            rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_9::*, rpc_full::*, rpc_minimal::*, *,
+            rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_9::*, rpc_full::*, rpc_minimal::*, *, rpc_metaplex::*
         },
         crate::{
             optimistically_confirmed_bank_tracker::{
@@ -4731,6 +5052,7 @@ pub mod tests {
             )
             .0;
 
+
             let mut io = MetaIoHandler::default();
             io.extend_with(rpc_minimal::MinimalImpl.to_delegate());
             io.extend_with(rpc_bank::BankDataImpl.to_delegate());
@@ -4751,10 +5073,111 @@ pub mod tests {
             }
         }
 
+        async fn start_with_db(db_url: &str) -> Self {
+            let (bank_forks, mint_keypair, leader_vote_keypair) = new_bank_forks();
+            let ledger_path = get_tmp_ledger_path!();
+            let blockstore = Arc::new(Blockstore::open(&ledger_path).unwrap());
+            let bank = bank_forks.read().unwrap().working_bank();
+
+            let identity = Pubkey::new_unique();
+            let leader_pubkey = *bank.collector_id();
+            let block_commitment_cache = Arc::new(RwLock::new(BlockCommitmentCache::default()));
+            let exit = Arc::new(AtomicBool::new(false));
+            let validator_exit = create_validator_exit(&exit);
+            let cluster_info = Arc::new(ClusterInfo::new(
+                ContactInfo {
+                    id: identity,
+                    ..ContactInfo::default()
+                },
+                Arc::new(Keypair::new()),
+                SocketAddrSpace::Unspecified,
+            ));
+            cluster_info.insert_info(ContactInfo::new_with_pubkey_socketaddr(
+                &leader_pubkey,
+                &socketaddr!("127.0.0.1:1234"),
+            ));
+            let max_slots = Arc::new(MaxSlots::default());
+            // note that this means that slot 0 will always be considered complete
+            let max_complete_transaction_status_slot = Arc::new(AtomicU64::new(0));
+
+            let meta = JsonRpcRequestProcessor::new(
+                JsonRpcConfig {
+                    enable_rpc_transaction_history: true,
+                    // rpc_threads: 20,
+                    ..JsonRpcConfig::default()
+                },
+                None,
+                bank_forks.clone(),
+                block_commitment_cache.clone(),
+                blockstore.clone(),
+                validator_exit,
+                RpcHealth::stub(),
+                cluster_info,
+                Hash::default(),
+                None,
+                OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+                Arc::new(RwLock::new(LargestAccountsCache::new(30))),
+                max_slots.clone(),
+                Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                max_complete_transaction_status_slot.clone(),
+            )
+            .0.with_metaplex_plugin_db({
+
+                // Metaplex plugin db params
+                let database_url: String = db_url.to_owned();
+                let metrics_port: u16 = 42069;
+                let metrics_host: String = "localhost".to_owned();
+                let server_port: u16 = 5432;
+
+                // Get db
+                let metaplex_plugin_db = DasApi::from_config(
+                    das_api::config::Config {
+                        database_url,
+                        metrics_port,
+                        metrics_host,
+                        server_port,
+                    })
+                    .await
+                    .unwrap();
+
+                // Attach db to processor
+                metaplex_plugin_db
+            });
+
+            let mut io = MetaIoHandler::default();
+            io.extend_with(rpc_minimal::MinimalImpl.to_delegate());
+            io.extend_with(rpc_bank::BankDataImpl.to_delegate());
+            io.extend_with(rpc_accounts::AccountsDataImpl.to_delegate());
+            io.extend_with(rpc_full::FullImpl.to_delegate());
+            io.extend_with(rpc_deprecated_v1_9::DeprecatedV1_9Impl.to_delegate());
+            io.extend_with(rpc_metaplex::MetaplexImpl.to_delegate());
+            Self {
+                io,
+                meta,
+                identity,
+                mint_keypair,
+                leader_vote_keypair,
+                bank_forks,
+                blockstore,
+                max_slots,
+                max_complete_transaction_status_slot,
+                block_commitment_cache,
+            }
+        }
+
         fn handle_request_sync(&self, req: serde_json::Value) -> Response {
             let response = &self
                 .io
                 .handle_request_sync(&req.to_string(), self.meta.clone())
+                .expect("no response");
+            serde_json::from_str(response).expect("failed to deserialize response")
+        }
+
+        async fn handle_request(&self, req: serde_json::Value) -> Response {
+            let response = &self
+                .io
+                .handle_request(&req.to_string(), self.meta.clone())
+                .await
                 .expect("no response");
             serde_json::from_str(response).expect("failed to deserialize response")
         }
@@ -4949,6 +5372,7 @@ pub mod tests {
         }
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_request_processor_new() {
         let bob_pubkey = solana_sdk::pubkey::new_rand();
@@ -4970,6 +5394,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_balance() {
         let genesis = create_genesis_config(20);
@@ -5003,6 +5428,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_balance_via_client() {
         let genesis = create_genesis_config(20);
@@ -5037,6 +5463,7 @@ pub mod tests {
         assert_eq!(response, 20);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_cluster_nodes() {
         let rpc = RpcHandler::start();
@@ -5054,7 +5481,499 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[tokio::test]
+    #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_get_cluster_nodes() {
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        assert!(rpc.meta.metaplex_plugin_db.is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_get_asset() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getAsset",
+            Some(json!(["6Krpto9SDnDCfe4vm89yMT6uNSzWnsi1ajaFcBNFT4qB"]))
+        );
+        println!("constructed request: {request:#?}");
+
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: Asset = parse_success_result(response);
+        println!("got asset: {result:#?}");
+
+        let mut expected =  Asset {
+            interface: digital_asset_types::rpc::Interface::NftOneZero,
+            id: "6Krpto9SDnDCfe4vm89yMT6uNSzWnsi1ajaFcBNFT4qB".to_owned(),
+            content: Some(
+                Content {
+                    schema: "https://schema.metaplex.com/nft1.0.json".to_owned(),
+                    files: Some(
+                        vec![
+                            digital_asset_types::rpc::File {
+                                uri: Some(
+                                    "".to_owned(),
+                                ),
+                                mime: None,
+                                quality: None,
+                                contexts: None,
+                            },
+                            digital_asset_types::rpc::File {
+                                uri: Some(
+                                    "https://www.bubblegum-nfts.com/api/gltf/asset/hdP8QRNhzvj/asset.gltf?ext=gltf".to_owned(),
+                                ),
+                                mime: Some(
+                                    "model/gltf".to_owned(),
+                                ),
+                                quality: None,
+                                contexts: None,
+                            },
+                        ],
+                    ),
+                    metadata: None,
+                    links: Some(HashMap::from([("external_url".to_string(), serde_json::Value::Null)])),
+                },
+            ),
+            authorities: Some(
+                vec![
+                    digital_asset_types::rpc::Authority {
+                        address: "FG694qNVLbYttp6c4o3iGDHGDQktAfgM3U5H58CNoNx5".to_owned(),
+                        scopes: vec![
+                            digital_asset_types::rpc::Scope::Full,
+                        ],
+                    }
+                ],
+            ),
+            compression: Some(
+                Compression {
+                    eligible: false,
+                    compressed: false,
+                },
+            ),
+            grouping: Some(
+                vec![],
+            ),
+            royalty: Some(
+                Royalty {
+                    royalty_model: digital_asset_types::rpc::RoyaltyModel::Creators,
+                    target: None,
+                    percent: 0.0,
+                    locked: false,
+                },
+            ),
+            creators: Some(
+                vec![
+                    digital_asset_types::rpc::Creator {
+                        address: "9wvQ7KAEsYdWeRFJTGvTfANcG9VtmW26wNKajbacqc6N".to_owned(),
+                        share: 20,
+                        verified: false,
+                    }
+                ],
+            ),
+            ownership: Ownership {
+                frozen: false,
+                delegated: false,
+                delegate: None,
+                ownership_model: OwnershipModel::Single,
+                owner: "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj".to_owned(),
+            },
+        };
+        
+        if result != expected {
+            expected.content.as_mut().unwrap().files.as_mut().unwrap().reverse();
+            assert_eq!(result, expected);
+        } else { /* equal so no need to assert */ }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_get_asset_proof() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getAssetProof",
+            Some(json!(["6Krpto9SDnDCfe4vm89yMT6uNSzWnsi1ajaFcBNFT4qB"]))
+        );
+        println!("constructed request: {request:#?}");
+
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetProof = parse_success_result(response);
+        println!("got proof: {result:?}");
+
+        let expected = AssetProof {
+            root: "EMMNtVYXaLtfbR67mR2H7E4Kqq4AaV2vv39KnHNWFX1B".to_owned(),
+            proof: vec![
+                "11111111111111111111111111111111".to_owned(),
+                "Cf5tmmFZ4D31tviuJezHdFLf5WF7yFvzfxNyftKsqTwr".to_owned(),
+                "DAbAU9srHpEUogXWuhy5VZ7g8UX9STymELtndcx1xgP1".to_owned(),
+                "3HCYqQRcQSChEuAw1ybNYHibrTNNjzbYzm56cmEmivB6".to_owned(),
+                "GSz87YKd3YoZWcEKhnjSsYJwv8o5aWGdBdGGYUphRfTh".to_owned(),
+                "zLUDhASAn7WA1Aqc724azRpZjKCjMQNATApe74JMg8C".to_owned(),
+                "ABnEXHmveD6iuMwfw2po7t6TPjn5kYMVwYJMi3fa9K91".to_owned(),
+                "JDh7eiWiUWtiWn623iybHqjQ6AQ6c2Czz8m6ZxwSCkta".to_owned(),
+                "BFvmeiEuzAYcMR8YxcuCMGYPDpjcmP5hsNbcswgQ8pMc".to_owned(),
+                "EvxphsdRErrDMs9nhFfF4nzq8i1C2KSogA7uB96TPpPR".to_owned(),
+                "HpMJWAzQv9HFgHBqY1o8V1B27sCYPFHJdGivDA658jEL".to_owned(),
+                "HjnrJn5vBUUzpCxzjjM9ZnCPuXei2cXKJjX468B9yWD7".to_owned(),
+                "4YCF1CSyTXm1Yi9W9JeYevawupkomdgy2dLxEBHL9euq".to_owned(),
+                "E3oMtCuPEauftdZLX8EZ8YX7BbFzpBCVRYEiLxwPJLY2".to_owned(),
+                "7DiCkBhs5HQLPEsKY6EjfNd3oBswnfRk9UAZcHqczL7m".to_owned(),
+                "FhsNgK6GGU1cRPFbmPhrEZ95Zj8vorjK6GmhFuwmZsUm".to_owned(),
+                "3e2oBSLfSDVdUdS7jRGFKa8nreJUA9sFPEELrHaQyd4J".to_owned(),
+                "GCXyEHiFMtRFTNFT5LNHwxiXZfooBpUMGSkjyz7pfcS5".to_owned(),
+                "752CmMF5k7acEFEmJA7oE3aobbWj7CAZVm3KpDR6HiRV".to_owned(),
+                "D9GGr1ycBmgRbHJyJzmxMk5aoKZmjdezB4NpxopAcgpP".to_owned(),
+            ],
+            node_index: 1048576,
+            leaf: "11111111111111111111111111111111".to_owned(),
+            tree_id: "CxrMzPxZEfaC984v8UTAMmpDHX9u3NKV4A9jco8fojyj".to_owned(),
+        };
+        
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_get_assets_by_owner() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getAssetsByOwner",
+            Some(json!([
+                "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj",
+                "created",
+                5,
+                0,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetList = parse_success_result(response);
+        println!("got assets: {result:?}");
+
+        let mut expected = AssetList {
+            total: 1,
+            limit: 5,
+            page: None,
+            before: None,
+            after: None,
+            items: vec![ 
+                Asset {
+                interface: digital_asset_types::rpc::Interface::NftOneZero,
+                id: "6Krpto9SDnDCfe4vm89yMT6uNSzWnsi1ajaFcBNFT4qB".to_owned(),
+                content: Some(
+                    Content {
+                        schema: "https://schema.metaplex.com/nft1.0.json".to_owned(),
+                        files: Some(
+                            vec![
+                                digital_asset_types::rpc::File {
+                                    uri: Some(
+                                        "".to_owned(),
+                                    ),
+                                    mime: None,
+                                    quality: None,
+                                    contexts: None,
+                                },
+                                digital_asset_types::rpc::File {
+                                    uri: Some(
+                                        "https://www.bubblegum-nfts.com/api/gltf/asset/hdP8QRNhzvj/asset.gltf?ext=gltf".to_owned(),
+                                    ),
+                                    mime: Some(
+                                        "model/gltf".to_owned(),
+                                    ),
+                                    quality: None,
+                                    contexts: None,
+                                },
+                            ],
+                        ),
+                        metadata: None,
+                        links: Some(HashMap::from([("external_url".to_string(), serde_json::Value::Null)])),
+                    },
+                ),
+                authorities: Some(
+                    vec![
+                        digital_asset_types::rpc::Authority {
+                            address: "FG694qNVLbYttp6c4o3iGDHGDQktAfgM3U5H58CNoNx5".to_owned(),
+                            scopes: vec![
+                                digital_asset_types::rpc::Scope::Full,
+                            ],
+                        }
+                    ],
+                ),
+                compression: Some(
+                    Compression {
+                        eligible: false,
+                        compressed: false,
+                    },
+                ),
+                grouping: Some(
+                    vec![],
+                ),
+                royalty: Some(
+                    Royalty {
+                        royalty_model: digital_asset_types::rpc::RoyaltyModel::Creators,
+                        target: None,
+                        percent: 0.0,
+                        locked: false,
+                    },
+                ),
+                creators: Some(
+                    vec![
+                        digital_asset_types::rpc::Creator {
+                            address: "9wvQ7KAEsYdWeRFJTGvTfANcG9VtmW26wNKajbacqc6N".to_owned(),
+                            share: 20,
+                            verified: false,
+                        }
+                    ],
+                ),
+                ownership: Ownership {
+                    frozen: false,
+                    delegated: false,
+                    delegate: None,
+                    ownership_model: OwnershipModel::Single,
+                    owner: "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj".to_owned(),
+                }}]};
+        
+        if result != expected {
+            expected.items[0].content.as_mut().unwrap().files.as_mut().unwrap().reverse();
+            assert_eq!(result, expected);
+        } else { /* equal so no need to assert */ }
+        
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_get_assets_by_creator() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getAssetsByCreator",
+            Some(json!([
+                ["9wvQ7KAEsYdWeRFJTGvTfANcG9VtmW26wNKajbacqc6N"],
+                "created",
+                5,
+                1,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetList = parse_success_result(response);
+        println!("got assets: {result:?}");
+
+        let mut expected = AssetList {
+            total: 1,
+            limit: 5,
+            page: Some(1),
+            before: None,
+            after: None,
+            items: vec![ 
+                Asset {
+                interface: digital_asset_types::rpc::Interface::NftOneZero,
+                id: "6Krpto9SDnDCfe4vm89yMT6uNSzWnsi1ajaFcBNFT4qB".to_owned(),
+                content: Some(
+                    Content {
+                        schema: "https://schema.metaplex.com/nft1.0.json".to_owned(),
+                        files: Some(
+                            vec![
+                                digital_asset_types::rpc::File {
+                                    uri: Some(
+                                        "".to_owned(),
+                                    ),
+                                    mime: None,
+                                    quality: None,
+                                    contexts: None,
+                                },
+                                digital_asset_types::rpc::File {
+                                    uri: Some(
+                                        "https://www.bubblegum-nfts.com/api/gltf/asset/hdP8QRNhzvj/asset.gltf?ext=gltf".to_owned(),
+                                    ),
+                                    mime: Some(
+                                        "model/gltf".to_owned(),
+                                    ),
+                                    quality: None,
+                                    contexts: None,
+                                },
+                            ],
+                        ),
+                        metadata: None,
+                        links: Some(HashMap::from([("external_url".to_string(), serde_json::Value::Null)])),
+                    },
+                ),
+                authorities: Some(
+                    vec![
+                        digital_asset_types::rpc::Authority {
+                            address: "FG694qNVLbYttp6c4o3iGDHGDQktAfgM3U5H58CNoNx5".to_owned(),
+                            scopes: vec![
+                                digital_asset_types::rpc::Scope::Full,
+                            ],
+                        }
+                    ],
+                ),
+                compression: Some(
+                    Compression {
+                        eligible: false,
+                        compressed: false,
+                    },
+                ),
+                grouping: Some(
+                    vec![],
+                ),
+                royalty: Some(
+                    Royalty {
+                        royalty_model: digital_asset_types::rpc::RoyaltyModel::Creators,
+                        target: None,
+                        percent: 0.0,
+                        locked: false,
+                    },
+                ),
+                creators: Some(
+                    vec![
+                        digital_asset_types::rpc::Creator {
+                            address: "9wvQ7KAEsYdWeRFJTGvTfANcG9VtmW26wNKajbacqc6N".to_owned(),
+                            share: 20,
+                            verified: false,
+                        }
+                    ],
+                ),
+                ownership: Ownership {
+                    frozen: false,
+                    delegated: false,
+                    delegate: None,
+                    ownership_model: OwnershipModel::Single,
+                    owner: "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj".to_owned(),
+                }}]};
+        
+        if result != expected {
+            expected.items[0].content.as_mut().unwrap().files.as_mut().unwrap().reverse();
+            assert_eq!(result, expected);
+        } else { /* equal so no need to assert */ }
+        
+        assert_eq!(result, expected);
+    }
+
+    #[cfg(feature = "metaplex")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_rpc_with_db_get_assets_by_group() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+
+        let request = create_test_request(
+            "getAssetsByGroup",
+            Some(json!([
+                [],
+                "created",
+                5,
+                1,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        // let response: Response = rpc.handle_request_sync(request);
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetList = parse_success_result(response);
+        println!("got assets: {result:?}");
+
+        // Should be all assets in test db
+        assert_eq!(result.total, 5);
+    }
+
+    #[cfg(feature = "metaplex")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_rpc_with_db_get_listed_assets_by_owner() {
+        use digital_asset_types::rpc::response::ListingsList;
+
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getListedAssetsByOwner",
+            Some(json!([
+                "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj",
+                "created",
+                5,
+                1,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        // let response: Response = rpc.handle_request_sync(request);
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: ListingsList = parse_success_result(response);
+        println!("got listings: {result:?}");
+
+        // Should be None
+        assert_eq!(result.total, 0);
+    }
+
+    #[cfg(feature = "metaplex")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_rpc_with_db_get_offers_by_owner() {
+        use digital_asset_types::rpc::response::OfferList;
+
+
+        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+            "getOffersByOwner",
+            Some(json!([
+                "AWaRtMX8rjkUGZtVTyFNqvSLgEkWdBqhSECoGSrBtwAj",
+                "created",
+                5,
+                1,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        // let response: Response = rpc.handle_request_sync(request);
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: OfferList = parse_success_result(response);
+        println!("got offers: {result:?}");
+
+        // Should be None
+        assert_eq!(result.total, 0);
+    }
+
     #[test]
+    #[cfg(not(feature = "metaplex"))]
     fn test_rpc_get_recent_performance_samples() {
         let rpc = RpcHandler::start();
 
@@ -5084,6 +6003,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_recent_performance_samples_invalid_limit() {
         let rpc = RpcHandler::start();
@@ -5096,6 +6016,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_slot_leader() {
         let rpc = RpcHandler::start();
@@ -5105,6 +6026,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_tx_count() {
         let bob_pubkey = solana_sdk::pubkey::new_rand();
@@ -5140,6 +6062,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_minimum_ledger_slot() {
         let rpc = RpcHandler::start();
@@ -5150,6 +6073,7 @@ pub mod tests {
         assert_eq!(0, result);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_supply() {
         let rpc = RpcHandler::start();
@@ -5177,6 +6101,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_supply_exclude_account_list() {
         let rpc = RpcHandler::start();
@@ -5197,6 +6122,7 @@ pub mod tests {
         assert_eq!(result.value, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_largest_accounts() {
         let rpc = RpcHandler::start();
@@ -5265,6 +6191,7 @@ pub mod tests {
         }));
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_minimum_balance_for_rent_exemption() {
         let rpc = RpcHandler::start();
@@ -5278,6 +6205,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_inflation() {
         let rpc = RpcHandler::start();
@@ -5302,6 +6230,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_epoch_schedule() {
         let rpc = RpcHandler::start();
@@ -5312,6 +6241,7 @@ pub mod tests {
         assert_eq!(expected, &result);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_leader_schedule() {
         let rpc = RpcHandler::start();
@@ -5348,6 +6278,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_slot_leaders() {
         let rpc = RpcHandler::start();
@@ -5389,6 +6320,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_account_info() {
         let rpc = RpcHandler::start();
@@ -5455,6 +6387,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_multiple_accounts() {
         let rpc = RpcHandler::start();
@@ -5547,6 +6480,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_program_accounts() {
         let rpc = RpcHandler::start();
@@ -5701,6 +6635,7 @@ pub mod tests {
         assert_eq!(result.len(), 0);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_simulate_transaction() {
         let rpc = RpcHandler::start();
@@ -5978,6 +6913,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     #[should_panic(expected = "simulation bank must be frozen")]
     fn test_rpc_simulate_transaction_panic_on_unfrozen_bank() {
@@ -6006,6 +6942,7 @@ pub mod tests {
         let _ = io.handle_request_sync(&req, meta);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_signature_statuses() {
         let rpc = RpcHandler::start();
@@ -6083,6 +7020,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_recent_blockhash() {
         let rpc = RpcHandler::start();
@@ -6112,6 +7050,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_fees() {
         let rpc = RpcHandler::start();
@@ -6143,6 +7082,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_fee_calculator_for_blockhash() {
         let rpc = RpcHandler::start();
@@ -6195,6 +7135,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_fee_rate_governor() {
         let RpcHandler { meta, io, .. } = RpcHandler::start();
@@ -6224,6 +7165,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_fail_request_airdrop() {
         let RpcHandler { meta, io, .. } = RpcHandler::start();
@@ -6244,6 +7186,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_send_bad_tx() {
         let genesis = create_genesis_config(100);
@@ -6265,6 +7208,7 @@ pub mod tests {
         assert_eq!(error["code"], ErrorCode::InvalidParams.code());
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_send_transaction_preflight() {
         let exit = Arc::new(AtomicBool::new(false));
@@ -6415,6 +7359,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_verify_filter() {
         #[allow(deprecated)]
@@ -6436,6 +7381,7 @@ pub mod tests {
         assert!(verify_filter(&filter).is_err());
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_verify_pubkey() {
         let pubkey = solana_sdk::pubkey::new_rand();
@@ -6447,6 +7393,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_verify_signature() {
         let tx = system_transaction::transfer(
@@ -6487,6 +7434,7 @@ pub mod tests {
         )
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_identity() {
         let rpc = RpcHandler::start();
@@ -6496,6 +7444,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_max_slots() {
         let rpc = RpcHandler::start();
@@ -6511,6 +7460,7 @@ pub mod tests {
         assert_eq!(result, 43);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_version() {
         let rpc = RpcHandler::start();
@@ -6526,6 +7476,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_processor_get_block_commitment() {
         let exit = Arc::new(AtomicBool::new(false));
@@ -6605,6 +7556,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_block_commitment() {
         let rpc = RpcHandler::start();
@@ -6638,6 +7590,7 @@ pub mod tests {
         assert_eq!(result, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_block_with_versioned_tx() {
         let rpc = RpcHandler::start();
@@ -6677,6 +7630,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_block() {
         let mut rpc = RpcHandler::start();
@@ -6784,6 +7738,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_block_config() {
         let rpc = RpcHandler::start();
@@ -6833,6 +7788,7 @@ pub mod tests {
         assert_eq!(confirmed_block.rewards.unwrap(), vec![]);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_block_production() {
         let rpc = RpcHandler::start();
@@ -6889,6 +7845,7 @@ pub mod tests {
         assert_eq!(result.value, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_blocks() {
         let rpc = RpcHandler::start();
@@ -6943,6 +7900,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_blocks_with_limit() {
         let rpc = RpcHandler::start();
@@ -6981,6 +7939,7 @@ pub mod tests {
         assert_eq!(result, Vec::<Slot>::new());
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_block_time() {
         let rpc = RpcHandler::start();
@@ -7019,6 +7978,7 @@ pub mod tests {
         assert_eq!(response, expected);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_vote_accounts() {
         let rpc = RpcHandler::start();
@@ -7222,6 +8182,7 @@ pub mod tests {
         }
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_is_finalized() {
         let bank = Arc::new(Bank::default_for_tests());
@@ -7267,6 +8228,7 @@ pub mod tests {
         ));
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_token_rpcs() {
         for program_id in solana_account_decoder::parse_token::spl_token_ids() {
@@ -7768,6 +8730,7 @@ pub mod tests {
         }
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_token_parsing() {
         for program_id in solana_account_decoder::parse_token::spl_token_ids() {
@@ -7982,6 +8945,7 @@ pub mod tests {
         }
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_spl_token_owner_filter() {
         // Filtering on token-v3 length
@@ -8063,6 +9027,7 @@ pub mod tests {
         .is_none());
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_get_spl_token_mint_filter() {
         // Filtering on token-v3 length
@@ -8144,6 +9109,7 @@ pub mod tests {
         .is_none());
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_single_gossip() {
         let exit = Arc::new(AtomicBool::new(false));
@@ -8286,6 +9252,7 @@ pub mod tests {
         assert_eq!(slot, 3);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_worst_case_encoded_tx_goldens() {
         let ff_tx = vec![0xffu8; PACKET_DATA_SIZE];
@@ -8295,6 +9262,7 @@ pub mod tests {
         assert_eq!(tx64.len(), MAX_BASE64_SIZE);
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_decode_and_deserialize_too_large_payloads_fail() {
         // +2 because +1 still fits in base64 encoded worst-case
@@ -8342,6 +9310,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_sanitize_unsanitary() {
         let unsanitary_tx58 = "ju9xZWuDBX4pRxX2oZkTjxU5jB4SSTgEGhX8bQ8PURNzyzqKMPPpNvWihx8zUe\
@@ -8367,6 +9336,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_sanitize_unsupported_transaction_version() {
         let versioned_tx = VersionedTransaction {
@@ -8389,6 +9359,7 @@ pub mod tests {
         );
     }
 
+    #[cfg(not(feature = "metaplex"))]
     #[test]
     fn test_rpc_get_stake_minimum_delegation() {
         let rpc = RpcHandler::start();

@@ -313,7 +313,7 @@ impl OptimisticallyConfirmedBankTracker {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod tests {
     use {
         super::*,

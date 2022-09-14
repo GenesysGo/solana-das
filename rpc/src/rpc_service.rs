@@ -59,7 +59,7 @@ const LARGEST_ACCOUNTS_CACHE_DURATION: u64 = 60 * 60 * 2;
 pub struct JsonRpcService {
     thread_hdl: JoinHandle<()>,
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub request_processor: JsonRpcRequestProcessor, // Used only by test_rpc_new()...
 
     close_handle: Option<CloseHandle>,
@@ -473,7 +473,7 @@ impl JsonRpcService {
             send_transaction_service_config,
         ));
 
-        #[cfg(test)]
+        #[cfg(all(test, not(feature = "metaplex")))]
         let test_request_processor = request_processor.clone();
 
         let ledger_path = ledger_path.to_path_buf();
@@ -543,7 +543,7 @@ impl JsonRpcService {
             .register_exit(Box::new(move || close_handle_.close()));
         Self {
             thread_hdl,
-            #[cfg(test)]
+            #[cfg(all(test, not(feature = "metaplex")))]
             request_processor: test_request_processor,
             close_handle: Some(close_handle),
         }
@@ -560,7 +560,7 @@ impl JsonRpcService {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod tests {
     use {
         super::*,

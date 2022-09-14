@@ -213,7 +213,7 @@ impl TransactionStatusService {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 pub(crate) mod tests {
     use {
         super::*,

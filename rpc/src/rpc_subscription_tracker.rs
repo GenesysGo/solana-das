@@ -266,17 +266,17 @@ impl SubscriptionControl {
         self.0.subscriptions.len()
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub fn assert_subscribed(&self, params: &SubscriptionParams) {
         assert!(self.0.subscriptions.contains_key(params));
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub fn assert_unsubscribed(&self, params: &SubscriptionParams) {
         assert!(!self.0.subscriptions.contains_key(params));
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub fn account_subscribed(&self, pubkey: &Pubkey) -> bool {
         self.0.subscriptions.iter().any(|item| {
             if let SubscriptionParams::Account(params) = item.key() {
@@ -287,7 +287,7 @@ impl SubscriptionControl {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub fn logs_subscribed(&self, pubkey: Option<&Pubkey>) -> bool {
         self.0.subscriptions.iter().any(|item| {
             if let SubscriptionParams::Logs(params) = item.key() {
@@ -302,7 +302,7 @@ impl SubscriptionControl {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "metaplex")))]
     pub fn signature_subscribed(&self, signature: &Signature) -> bool {
         self.0.subscriptions.iter().any(|item| {
             if let SubscriptionParams::Signature(params) = item.key() {
@@ -588,7 +588,7 @@ impl SubscriptionToken {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "metaplex")))]
 mod tests {
     use {
         super::*,
