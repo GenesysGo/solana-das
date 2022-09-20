@@ -5700,8 +5700,8 @@ pub mod tests {
             items: vec![],
         };
         
-        // Should contain all things in db
-        assert_eq!(result.total, 11);
+        // Should contain eight things
+        assert_eq!(result.total, 8);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
