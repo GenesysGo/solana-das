@@ -5659,6 +5659,52 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "metaplex")]
+    async fn test_rpc_with_db_search_assets() {
+
+        env_logger::builder()
+            .filter_level(log::LevelFilter::Error)
+            .init();
+            
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
+        println!("rpc online");
+        
+        let request = create_test_request(
+        "searchAssets",
+            Some(json!([
+                {
+                    "compressed": true,
+                    "frozen": false,
+                    "condition_type": "All",
+                },
+                "created",
+                100,
+                0,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetList = parse_success_result(response);
+        println!("got search results: {result:?}");
+
+        let expected = AssetList {
+            after: None,
+            before: None,
+            limit: 5,
+            page: Some(1),
+            total: 1,
+            items: vec![],
+        };
+        
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_assets_by_owner() {
 
         let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
