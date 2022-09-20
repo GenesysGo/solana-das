@@ -2987,7 +2987,7 @@ pub mod rpc_metaplex {
     use super::*;
     use das_api::{api::ApiContract};
     use digital_asset_types::rpc::{AssetProof, Asset, filter::{AssetSorting, ListingSorting, OfferSorting}, response::{AssetList, OfferList, ListingsList}};
-    use jsonrpc_core::ErrorCode;
+    use jsonrpc_core::{ErrorCode, Value};
 
     #[rpc]
     pub trait MetaplexRpc {
@@ -3077,7 +3077,7 @@ pub mod rpc_metaplex {
         fn search_assets(
             &self,
             meta: Self::Metadata,
-            _search_expression: String,
+            search_expression: Value,
             _sort_by: AssetSorting,
             _limit: u32,
             _page: u32,
