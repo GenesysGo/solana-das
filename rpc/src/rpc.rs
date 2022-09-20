@@ -5484,7 +5484,7 @@ pub mod tests {
     #[tokio::test]
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_cluster_nodes() {
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         assert!(rpc.meta.metaplex_plugin_db.is_some());
     }
 
@@ -5492,7 +5492,9 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset() {
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        
+
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
@@ -5594,7 +5596,7 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset_proof() {
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
@@ -5645,7 +5647,7 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_assets_by_owner() {
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
@@ -5762,7 +5764,7 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_assets_by_creator() {
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
@@ -5879,7 +5881,7 @@ pub mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_rpc_with_db_get_assets_by_group() {
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
 
         let request = create_test_request(
@@ -5912,7 +5914,7 @@ pub mod tests {
         use digital_asset_types::rpc::response::ListingsList;
 
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
@@ -5945,7 +5947,7 @@ pub mod tests {
         use digital_asset_types::rpc::response::OfferList;
 
 
-        let rpc = RpcHandler::start_with_db("postgresql://postgres:postgres@localhost:5432/nfts?sslmode=disable").await;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
         let request = create_test_request(
