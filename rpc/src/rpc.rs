@@ -3078,12 +3078,12 @@ pub mod rpc_metaplex {
             &self,
             meta: Self::Metadata,
             search_expression: Value,
-            _sort_by: AssetSorting,
-            _limit: u32,
-            _page: u32,
-            _before: String,
-            _after: String,
-        ) -> BoxFuture<Result<()>>;
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>>;
     }
 
     pub struct MetaplexImpl;
@@ -3275,15 +3275,29 @@ pub mod rpc_metaplex {
 
         fn search_assets(
             &self,
-            _meta: Self::Metadata,
-            _search_expression: String,
-            _sort_by: AssetSorting,
-            _limit: u32,
-            _page: u32,
-            _before: String,
-            _after: String,
-        ) -> BoxFuture<Result<()>> {
-            Box::pin(async move { todo!("The underlying rpc method is not implemented in the das api")})
+            meta: Self::Metadata,
+            search_expression: Value,
+            sort_by: AssetSorting,
+            limit: u32,
+            page: u32,
+            before: String,
+            after: String,
+        ) -> BoxFuture<Result<AssetList>> {
+            Box::pin(async move {
+                let result;
+                if let Some(ref db) = meta.metaplex_plugin_db {
+                    result = db
+                        .search_assets(search_expression, sort_by, limit, page, before, after)
+                        .await
+                } else {
+                    panic!("rpc started up without a metaplex plugin db");
+                }
+                result
+                .map_err(|err| {
+                    log::error!("{err:?}");
+                    jsonrpc_core::Error::new(ErrorCode::InternalError)
+                })
+            })
         }
     }
 }
