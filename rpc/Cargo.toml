@@ -14,9 +14,11 @@ base64 = "0.13.0"
 bincode = "1.3.3"
 bs58 = "0.4.0"
 crossbeam-channel = "0.5"
-dashmap = "4.0.2"
-das_api = { git = "https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git", branch = "cavey/das_api_version" }
-digital_asset_types = { git = "https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git", branch = "cavey/das_api_version" }
+dashmap = "5.4.0"
+#das_api = { git = "https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git", branch = "cavey/das_api_version" }
+#digital_asset_types = { git = "https://github.com/GenesysGo/digital-asset-rpc-infrastructure.git", branch = "cavey/das_api_version" }
+das_api = { path = "../../digital-asset-rpc-infrastructure/das_api" }
+digital_asset_types = { path = "../../digital-asset-rpc-infrastructure/digital_asset_types" }
 itertools = "0.10.3"
 jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0" }
@@ -61,7 +63,7 @@ tokio-util = { version = "0.6", features = ["codec", "compat"] }
 [dev-dependencies]
 env_logger = "0.9.0"
 log = "0.4.17"
-serial_test = "0.8.0"
+serial_test = "0.9.0"
 solana-address-lookup-table-program = { path = "../programs/address-lookup-table", version = "=1.11.7" }
 solana-net-utils = { path = "../net-utils", version = "=1.11.7" }
 solana-stake-program = { path = "../programs/stake", version = "=1.11.7" }
@@ -72,7 +74,7 @@ crate-type = ["lib"]
 name = "solana_rpc"
 
 [features]
-default = ["metaplex"]
+default = []
 metaplex = []
 
 [package.metadata.docs.rs]

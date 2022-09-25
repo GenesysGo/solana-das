@@ -13,6 +13,10 @@ edition = "2021"
 [badges]
 codecov = { repository = "solana-labs/solana", branch = "master", service = "github" }
 
+[features]
+default = ["metaplex"]
+metaplex = ["solana-rpc/metaplex"]
+
 [dependencies]
 ahash = "0.7.6"
 base64 = "0.13.0"

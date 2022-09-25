@@ -10,6 +10,10 @@ homepage = "https://solana.com/"
 documentation = "https://docs.rs/solana-validator"
 default-run = "solana-validator"
 
+[features]
+default = ["metaplex"]
+metaplex = ["solana-rpc/metaplex", "solana-core/metaplex"]
+
 [dependencies]
 chrono = { version = "0.4.11", features = ["serde"] }
 clap = "2.33.1"
