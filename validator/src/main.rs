@@ -2583,6 +2583,12 @@ pub fn main() {
             rpc_niceness_adj: value_t_or_exit!(matches, "rpc_niceness_adj", i8),
             account_indexes: account_indexes.clone(),
             rpc_scan_and_fix_roots: matches.is_present("rpc_scan_and_fix_roots"),
+            #[cfg(feature = "metaplex")]
+            metaplex_plugin_db: value_t!(matches, "metaplex_plugin_db", String)
+                .map_err(|e| {
+                    log::warn!("did not specify metaplex plugin db (or specified an invalid db) with feature = metaplex. Quietly proceeding with no metaplex db");
+                    e
+                }).ok(),
         },
         geyser_plugin_config_files,
         rpc_addrs: value_t!(matches, "rpc_port", u16).ok().map(|rpc_port| {
