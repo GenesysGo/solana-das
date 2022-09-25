@@ -1,5 +1,7 @@
 //! The `rpc` module implements the Solana RPC interface.
 
+use das_api::DasApiError;
+
 use {
     crate::{
         max_slots::MaxSlots, optimistically_confirmed_bank_tracker::OptimisticallyConfirmedBank,
@@ -161,6 +163,8 @@ pub struct JsonRpcConfig {
     pub full_api: bool,
     pub obsolete_v1_7_api: bool,
     pub rpc_scan_and_fix_roots: bool,
+    #[cfg(feature = "metaplex")]
+    pub metaplex_plugin_db: Option<String>,
 }
 
 impl JsonRpcConfig {
@@ -212,6 +216,7 @@ pub struct JsonRpcRequestProcessor {
     max_slots: Arc<MaxSlots>,
     leader_schedule_cache: Arc<LeaderScheduleCache>,
     max_complete_transaction_status_slot: Arc<AtomicU64>,
+    #[cfg(feature = "metaplex")]
     metaplex_plugin_db: Option<Arc<DasApi>>,
 }
 impl Metadata for JsonRpcRequestProcessor {}
@@ -338,7 +343,8 @@ impl JsonRpcRequestProcessor {
                 max_slots,
                 leader_schedule_cache,
                 max_complete_transaction_status_slot,
-                metaplex_plugin_db: None
+                #[cfg(feature = "metaplex")]
+                metaplex_plugin_db: None,
             },
             receiver,
         )
@@ -413,6 +419,29 @@ impl JsonRpcRequestProcessor {
     ) -> Self {
         self.metaplex_plugin_db = Some(Arc::new(metaplex_plugin_db));
         self
+    }
+
+    pub async fn with_metaplex_plugin_db_from_str(
+        mut self,
+        database_url: String,
+    ) -> std::result::Result<Self, DasApiError> {
+        let das_api = DasApi::from_config(
+            das_api::Config {
+                database_url,
+                // These don't do anything...
+                metrics_port: 0000,
+                metrics_host: "".to_owned(),
+                server_port: 0000,
+            }
+        ).await;
+
+        if let Ok(metaplex_plugin_db) = das_api {
+            self.metaplex_plugin_db = Some(Arc::new(metaplex_plugin_db));
+            Ok(self)
+        } else {
+            // DasApi does not implement Debug...
+            unsafe { Err(das_api.unwrap_err_unchecked()) }
+        }        
     }
 
     pub fn get_account_info(

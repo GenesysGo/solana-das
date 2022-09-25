@@ -7,7 +7,7 @@ use {
         optimistically_confirmed_bank_tracker::OptimisticallyConfirmedBank,
         rpc::{
             rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_7::*, rpc_deprecated_v1_9::*,
-            rpc_full::*, rpc_minimal::*, rpc_obsolete_v1_7::*, *,
+            rpc_full::*, rpc_minimal::*, rpc_obsolete_v1_7::*, rpc_metaplex::*, *,
         },
         rpc_health::*,
     },
@@ -355,6 +355,8 @@ impl JsonRpcService {
         leader_schedule_cache: Arc<LeaderScheduleCache>,
         connection_cache: Arc<ConnectionCache>,
         current_transaction_status_slot: Arc<AtomicU64>,
+        #[cfg(feature = "metaplex")]
+        metaplex_plugin_db_url: Option<&String>,
     ) -> Self {
         info!("rpc bound to {:?}", rpc_addr);
         info!("rpc configuration: {:?}", config);
@@ -461,6 +463,18 @@ impl JsonRpcService {
             leader_schedule_cache,
             current_transaction_status_slot,
         );
+        #[cfg(feature = "metaplex")]
+        let request_processor = {
+            if let Some(metaplex_plugin_db_url) = metaplex_plugin_db_url {
+                runtime
+                    .block_on(async move {
+                        let rp: std::result::Result<_,_> = request_processor
+                            .with_metaplex_plugin_db_from_str(metaplex_plugin_db_url.to_owned())
+                            .await;
+                        rp.unwrap()
+                        })
+            } else { request_processor }
+        };
 
         let leader_info =
             poh_recorder.map(|recorder| ClusterTpuInfo::new(cluster_info.clone(), recorder));
@@ -497,6 +511,8 @@ impl JsonRpcService {
                 if obsolete_v1_7_api {
                     io.extend_with(rpc_obsolete_v1_7::ObsoleteV1_7Impl.to_delegate());
                 }
+                #[cfg(feature = "metaplex")]
+                io.extend_with(rpc_metaplex::MetaplexImpl.to_delegate());
 
                 let request_middleware = RpcRequestMiddleware::new(
                     ledger_path,
