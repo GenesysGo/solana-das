@@ -825,6 +825,8 @@ impl Validator {
                     leader_schedule_cache.clone(),
                     connection_cache.clone(),
                     max_complete_transaction_status_slot,
+                    #[cfg(feature = "metaplex")]
+                    config.rpc_config.metaplex_plugin_db.as_ref(),
                 )),
                 if !config.rpc_config.full_api {
                     None
