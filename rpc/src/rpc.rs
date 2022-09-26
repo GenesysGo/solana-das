@@ -1,6 +1,7 @@
 //! The `rpc` module implements the Solana RPC interface.
 
-use das_api::DasApiError;
+#[cfg(feature = "metaplex")]
+use das_api::{DasApiError, api_impl::DasApi};
 
 use {
     crate::{
@@ -9,7 +10,6 @@ use {
     },
     bincode::{config::Options, serialize},
     crossbeam_channel::{unbounded, Receiver, Sender},
-    das_api::api_impl::DasApi,
     jsonrpc_core::{futures::future, types::error, BoxFuture, Error, Metadata, Result},
     jsonrpc_derive::rpc,
     serde::{Deserialize, Serialize},
@@ -409,10 +409,12 @@ impl JsonRpcRequestProcessor {
             max_slots: Arc::new(MaxSlots::default()),
             leader_schedule_cache: Arc::new(LeaderScheduleCache::new_from_bank(bank)),
             max_complete_transaction_status_slot: Arc::new(AtomicU64::default()),
+            #[cfg(feature = "metaplex")]
             metaplex_plugin_db: None,
         }
     }
 
+    #[cfg(feature = "metaplex")]
     pub fn with_metaplex_plugin_db(
         mut self,
         metaplex_plugin_db: DasApi,
@@ -421,6 +423,7 @@ impl JsonRpcRequestProcessor {
         self
     }
 
+    #[cfg(feature = "metaplex")]
     pub async fn with_metaplex_plugin_db_from_str(
         mut self,
         database_url: String,
@@ -3012,6 +3015,7 @@ pub mod rpc_bank {
 
 
 // RPC interface that uses metaplex db
+#[cfg(feature = "metaplex")]
 pub mod rpc_metaplex {
     use super::*;
     use das_api::{api::ApiContract};
@@ -4921,11 +4925,16 @@ pub fn populate_blockstore_for_tests(
 
 #[cfg(test)]
 pub mod tests {
-    use digital_asset_types::rpc::{Asset, Interface, Ownership, OwnershipModel, AssetProof, response::AssetList, Royalty, Compression, Content};
+    
+    #[cfg(feature = "metaplex")]
+    use {
+        digital_asset_types::rpc::{Asset, Interface, Ownership, OwnershipModel, AssetProof, response::AssetList, Royalty, Compression, Content},
+        super::rpc_metaplex::*,
+    };
 
     use {
         super::{
-            rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_9::*, rpc_full::*, rpc_minimal::*, *, rpc_metaplex::*
+            rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_9::*, rpc_full::*, rpc_minimal::*, *, 
         },
         crate::{
             optimistically_confirmed_bank_tracker::{
@@ -5163,8 +5172,10 @@ pub mod tests {
                 max_slots.clone(),
                 Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
                 max_complete_transaction_status_slot.clone(),
-            )
-            .0.with_metaplex_plugin_db({
+            ).0;
+            #[cfg(feature = "metaplex")]
+            let meta = meta
+                .with_metaplex_plugin_db({
 
                 // Metaplex plugin db params
                 let database_url: String = db_url.to_owned();
@@ -5193,6 +5204,7 @@ pub mod tests {
             io.extend_with(rpc_accounts::AccountsDataImpl.to_delegate());
             io.extend_with(rpc_full::FullImpl.to_delegate());
             io.extend_with(rpc_deprecated_v1_9::DeprecatedV1_9Impl.to_delegate());
+            #[cfg(feature = "metaplex")]
             io.extend_with(rpc_metaplex::MetaplexImpl.to_delegate());
             Self {
                 io,
@@ -5535,7 +5547,9 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset() {
 
-        
+        env_logger::builder()
+            .filter_level(log::LevelFilter::Error)
+            .try_init();
 
         let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
@@ -5639,6 +5653,10 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset_proof() {
 
+        env_logger::builder()
+            .filter_level(log::LevelFilter::Error)
+            .try_init();
+
         let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
         
@@ -5692,7 +5710,7 @@ pub mod tests {
 
         env_logger::builder()
             .filter_level(log::LevelFilter::Error)
-            .init();
+            .try_init();
             
         let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
@@ -5969,7 +5987,7 @@ pub mod tests {
 
     #[cfg(feature = "metaplex")]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_rpc_with_db_get_assets_by_group() {
+    async fn test_rpc_with_db_get_assets_by_group_null() {
 
         let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
         println!("rpc online");
@@ -6000,6 +6018,38 @@ pub mod tests {
 
     #[cfg(feature = "metaplex")]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_rpc_with_db_get_assets_by_group() {
+
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:2345/nfts?sslmode=disable").await;
+        println!("rpc online");
+
+        let request = create_test_request(
+            "getAssetsByGroup",
+            Some(json!([
+                ["TWFuLevyNkCyGLAiPjFwTXWiMq9mVbvyQjx16xHtLLx"],
+                "created",
+                5,
+                1,
+                "",
+                "",
+            ]))
+        );
+        println!("constructed request: {request:#?}");
+
+        // let response: Response = rpc.handle_request_sync(request);
+        let response: Response = rpc.handle_request(request).await;
+        println!("got response: {response:#?}");
+
+        let result: AssetList = parse_success_result(response);
+        println!("got assets: {result:?}");
+
+        // Should be all assets in test db
+        assert_eq!(result.total, 3);
+    }
+
+    #[cfg(feature = "metaplex")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore] // owner stuff not implemented yet in metaplex das api
     async fn test_rpc_with_db_get_listed_assets_by_owner() {
         use digital_asset_types::rpc::response::ListingsList;
 
@@ -6033,6 +6083,7 @@ pub mod tests {
 
     #[cfg(feature = "metaplex")]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore] // offer stuff not implemented yet in metaplex das api
     async fn test_rpc_with_db_get_offers_by_owner() {
         use digital_asset_types::rpc::response::OfferList;
 

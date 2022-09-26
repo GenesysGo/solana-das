@@ -7,10 +7,12 @@ use {
         optimistically_confirmed_bank_tracker::OptimisticallyConfirmedBank,
         rpc::{
             rpc_accounts::*, rpc_bank::*, rpc_deprecated_v1_7::*, rpc_deprecated_v1_9::*,
-            rpc_full::*, rpc_minimal::*, rpc_obsolete_v1_7::*, rpc_metaplex::*, *,
+            rpc_full::*, rpc_minimal::*, rpc_obsolete_v1_7::*, *,
+            
         },
         rpc_health::*,
     },
+
     crossbeam_channel::unbounded,
     jsonrpc_core::{futures::prelude::*, MetaIoHandler},
     jsonrpc_http_server::{
@@ -51,6 +53,9 @@ use {
     },
     tokio_util::codec::{BytesCodec, FramedRead},
 };
+
+#[cfg(feature = "metaplex")]
+use crate::rpc::rpc_metaplex::*;
 
 const FULL_SNAPSHOT_REQUEST_PATH: &str = "/snapshot.tar.bz2";
 const INCREMENTAL_SNAPSHOT_REQUEST_PATH: &str = "/incremental-snapshot.tar.bz2";
