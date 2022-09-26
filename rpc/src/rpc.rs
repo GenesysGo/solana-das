@@ -3022,15 +3022,10 @@ pub mod rpc_metaplex {
     use digital_asset_types::rpc::{AssetProof, Asset, filter::{AssetSorting, ListingSorting, OfferSorting}, response::{AssetList, OfferList, ListingsList}};
     use jsonrpc_core::{ErrorCode, Value};
 
+    
     #[rpc]
     pub trait MetaplexRpc {
         type Metadata;
-
-        #[rpc(meta, name = "getSomethingFromPostgres")]
-        fn get_something_from_postgres(
-            &self,
-            meta: Self::Metadata,
-        ) -> BoxFuture<Result<String>>;
 
         #[rpc(meta, name = "getAssetProof")]
         fn get_asset_proof(
@@ -3123,41 +3118,26 @@ pub mod rpc_metaplex {
     impl MetaplexRpc for MetaplexImpl {
         type Metadata = JsonRpcRequestProcessor;
 
-        fn get_something_from_postgres(
-            &self,
-            mut meta: Self::Metadata,
-        ) -> BoxFuture<Result<String>> {
-            Box::pin(async move { async move {
-                if let Some(ref mut db) = meta.metaplex_plugin_db {
-                    dbg!("lets fix this");
-                    db.check_health()
-                        .await
-                        .map_err(|err| {
-                            log::error!("{err:?}");
-                            jsonrpc_core::Error::new(ErrorCode::InternalError)
-                        })?;
-                }
-                Ok(String::from("RIP Queen"))
-            }.await })
-        }
-
         fn get_asset_proof(
             &self,
             meta: Self::Metadata,
             id: String
         ) -> BoxFuture<Result<AssetProof>> {
             Box::pin( async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_asset_proof(id).await;
+                    match db.get_asset_proof(id).await {
+                        Ok(proof) => Ok(proof),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }
+                        }
+                    }
                 } else {
-                    unreachable!()
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3167,17 +3147,20 @@ pub mod rpc_metaplex {
             id: String
         ) -> BoxFuture<Result<Asset>> {
             Box::pin( async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_asset(id).await;
+                    match db.get_asset(id).await {
+                        Ok(asset) => Ok(asset),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }
+                        }
+                    }
                 } else {
-                    unreachable!()
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3192,17 +3175,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<AssetList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_assets_by_owner(owner_address, sort_by, limit, page, before, after).await
+                    match db.get_assets_by_owner(owner_address, sort_by, limit, page, before, after).await {
+                        Ok(assets) => Ok(assets),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3217,17 +3203,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<ListingsList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_listed_assets_by_owner(owner_address, sort_by, limit, page, before, after).await
+                    match db.get_listed_assets_by_owner(owner_address, sort_by, limit, page, before, after).await {
+                        Ok(listed_assets) => Ok(listed_assets),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3242,17 +3231,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<OfferList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_offers_by_owner(owner_address, sort_by, limit, page, before, after).await
+                    match db.get_offers_by_owner(owner_address, sort_by, limit, page, before, after).await  {
+                        Ok(offers) => Ok(offers),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3267,17 +3259,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<AssetList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_assets_by_group(group_expression, sort_by, limit, page, before, after).await
+                    match db.get_assets_by_group(group_expression, sort_by, limit, page, before, after).await {
+                        Ok(group_assets) => Ok(group_assets),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }    
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3292,17 +3287,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<AssetList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db.get_assets_by_creator(creator_expression, sort_by, limit, page, before, after).await
+                    match db.get_assets_by_creator(creator_expression, sort_by, limit, page, before, after).await {
+                        Ok(creator_assets) => Ok(creator_assets),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }    
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                    .map_err(|err| {
-                        log::error!("{err:?}");
-                        jsonrpc_core::Error::new(ErrorCode::InternalError)
-                    })
             })
         }
 
@@ -3317,19 +3315,20 @@ pub mod rpc_metaplex {
             after: String,
         ) -> BoxFuture<Result<AssetList>> {
             Box::pin(async move {
-                let result;
                 if let Some(ref db) = meta.metaplex_plugin_db {
-                    result = db
-                        .search_assets(search_expression, sort_by, limit, page, before, after)
-                        .await
+                    match db.search_assets(search_expression, sort_by, limit, page, before, after).await {
+                        Ok(assets) => Ok(assets),
+                        Err(err) => {
+                            log::error!("{err:?}");
+                            match err {
+                                DasApiError::DatabaseError(_) => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69419))),
+                                _ => Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69418))),
+                            }    
+                        }
+                    }
                 } else {
-                    panic!("rpc started up without a metaplex plugin db");
+                    return Err(jsonrpc_core::Error::new(ErrorCode::ServerError(-69420)).into())
                 }
-                result
-                .map_err(|err| {
-                    log::error!("{err:?}");
-                    jsonrpc_core::Error::new(ErrorCode::InternalError)
-                })
             })
         }
     }
@@ -5538,15 +5537,30 @@ pub mod tests {
 
     #[tokio::test]
     #[cfg(feature = "metaplex")]
-    async fn test_rpc_with_db_get_cluster_nodes() {
-        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable").await;
+    async fn test_rpc_with_db() {
+        use das_api::api::ApiContract;
+        let rpc = RpcHandler::start_with_db("postgresql://generalsherman:myboishermyg@localhost:5432/nfts?sslmode=disable")
+            .await;
         assert!(rpc.meta.metaplex_plugin_db.is_some());
+        let healthy = rpc.meta.metaplex_plugin_db
+            .as_deref()
+            .unwrap()
+            .check_health()
+            .await;
+        assert!(
+            rpc.meta.metaplex_plugin_db
+                .as_deref()
+                .unwrap()
+                .check_health()
+                .await
+                .is_ok());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset() {
 
+        #[allow(unused_must_use)]
         env_logger::builder()
             .filter_level(log::LevelFilter::Error)
             .try_init();
@@ -5653,6 +5667,7 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_get_asset_proof() {
 
+        #[allow(unused_must_use)]
         env_logger::builder()
             .filter_level(log::LevelFilter::Error)
             .try_init();
@@ -5708,6 +5723,7 @@ pub mod tests {
     #[cfg(feature = "metaplex")]
     async fn test_rpc_with_db_search_assets() {
 
+        #[allow(unused_must_use)]
         env_logger::builder()
             .filter_level(log::LevelFilter::Error)
             .try_init();
